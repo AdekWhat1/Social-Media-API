@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 def profile_image_file_path(instance, filename):
     _, extension = os.path.splitext(filename)
     filename = f"{slugify(instance.email)}-{uuid.uuid4()}{extension}"
+    return os.path.join("uploads/profile_pics/", filename)
 
 
 class UserManager(BaseUserManager):
@@ -49,8 +50,7 @@ class User(AbstractUser):
         blank=True,
         null=True,
     )
-    birthday = models.DateField(
-        _("birthday"), blank=True)
+    birthday = models.DateField(_("birthday"), blank=True, null=True)
     bio = models.TextField(_("bio"), blank=True)
     following = models.ManyToManyField(
         "self", symmetrical=False, related_name="followers", blank=True
