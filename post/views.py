@@ -1,3 +1,10 @@
+from drf_spectacular.utils import (
+    extend_schema_view,
+    extend_schema,
+    OpenApiParameter,
+    OpenApiResponse,
+    OpenApiExample,
+)
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
@@ -23,6 +30,54 @@ class HashtagViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="List published posts",
+        description="Retrieve a paginated list of all published posts. Supports filtering by author, hashtag, or keyword search.",
+        parameters=[
+            OpenApiParameter(
+                name="author",
+                description="Filter posts by author ID",
+                required=False,
+                type=int,
+            ),
+            OpenApiParameter(
+                name="hashtag",
+                description="Filter posts by hashtag name (case-insensitive, omit the '#' symbol)",
+                required=False,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="search",
+                description="Search across post text and hashtags",
+                required=False,
+                type=str,
+            ),
+        ],
+    ),
+    retrieve=extend_schema(
+        summary="Retrieve post details",
+        description="Retrieve complete details for a specific post, including its comments and media attachments.",
+        responses={200: PostDetailSerializer},
+    ),
+    create=extend_schema(
+        summary="Create a new post",
+        description="Create a post authored by the currently authenticated user. An optional scheduled_time can be supplied for deferred publishing.",
+        responses={201: PostDetailSerializer},
+    ),
+    update=extend_schema(
+        summary="Update a post",
+        description="Completely update an existing post. Restricted to the post's author.",
+    ),
+    partial_update=extend_schema(
+        summary="Partially update a post",
+        description="Partially update an existing post. Restricted to the post's author.",
+    ),
+    destroy=extend_schema(
+        summary="Delete a post",
+        description="Delete a post. Restricted to the post's author or staff administrators.",
+    ),
+)
 class PostViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [SearchFilter]
@@ -65,6 +120,11 @@ class PostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+    @extend_schema(
+        summary="Retrieve following feed",
+        description="Retrieve a paginated list of posts authored exclusively by users the current account follows.",
+        responses={200: PostListSerializer(many=True)},
+    )
     @action(detail=False, methods=["GET"], url_path="feed")
     def feed(self, request):
         """Стрічка постів тільки тих користувачів, на яких підписаний юзер."""
@@ -78,6 +138,31 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = PostListSerializer(posts, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary="Like a post",
+        description="Add a like to a post on behalf of the authenticated user.",
+        request=None,
+        responses={
+            201: OpenApiResponse(
+                description="Post liked successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={"detail": "Post liked successfully."},
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description="Conflict - post already liked",
+                examples=[
+                    OpenApiExample(
+                        "Duplicate",
+                        value={"detail": "You already liked this post."},
+                    )
+                ],
+            ),
+        },
+    )
     @action(detail=True, methods=["POST"], url_path="like")
     def like(self, request, pk=None):
         """Поставити лайк посту."""
@@ -93,6 +178,31 @@ class PostViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @extend_schema(
+        summary="Unlike a post",
+        description="Remove an existing like from a post.",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Post unliked successfully",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={"detail": "Post unliked successfully."},
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description="Bad Request - like does not exist",
+                examples=[
+                    OpenApiExample(
+                        "Not found",
+                        value={"detail": "You have not liked this post."},
+                    )
+                ],
+            ),
+        },
+    )
     @action(detail=True, methods=["POST"], url_path="unlike")
     def unlike(self, request, pk=None):
         """Прибрати лайк з поста."""
@@ -109,9 +219,15 @@ class PostViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        summary="Upload an image to a post",
+        description="Upload an image attachment using multipart/form-data and attach it to the post. Restricted to the post's author.",
+        request=PostImageSerializer,
+        responses={201: PostImageSerializer},
+    )
     @action(detail=True, methods=["POST"], url_path="upload-image")
     def upload_image(self, request, pk=None):
-        """Завантаження зображення до конкретного поста."""
+
         post = self.get_object()
         if post.author != request.user and not request.user.is_staff:
             return Response(
