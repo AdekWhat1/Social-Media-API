@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
@@ -44,7 +45,6 @@ class UserViewSet(
 
     @action(detail=False, methods=["GET", "PATCH"], url_path="me")
     def me(self, request):
-        """Ендпоінт для перегляду та редагування власного профілю."""
         user = request.user
         if request.method == "PATCH":
             serializer = UserDetailSerializer(user, data=request.data, partial=True)
@@ -57,7 +57,6 @@ class UserViewSet(
 
     @action(detail=True, methods=["POST"], url_path="follow")
     def follow(self, request, pk=None):
-        """Підписатися на користувача."""
         target_user = self.get_object()
         if target_user == request.user:
             return Response(
@@ -81,7 +80,6 @@ class UserViewSet(
 
     @action(detail=True, methods=["POST"], url_path="unfollow")
     def unfollow(self, request, pk=None):
-        """Відписатися від користувача."""
         target_user = self.get_object()
         if target_user == request.user:
             return Response(
@@ -102,3 +100,35 @@ class UserViewSet(
             },
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        summary="List user followers",
+        description="Retrieve a paginated list of users following the specified user.",
+        responses={200: UserListSerializer(many=True)},
+    )
+    @action(detail=True, methods=["GET"], url_path="followers")
+    def followers(self, request, pk=None):
+        user = self.get_object()
+        followers = user.followers.all()
+        page = self.paginate_queryset(followers)
+        if page is not None:
+            serializer = UserListSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = UserListSerializer(followers, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="List user following",
+        description="Retrieve a paginated list of users that the specified user is following.",
+        responses={200: UserListSerializer(many=True)},
+    )
+    @action(detail=True, methods=["GET"], url_path="following")
+    def following(self, request, pk=None):
+        user = self.get_object()
+        following = user.following.all()
+        page = self.paginate_queryset(following)
+        if page is not None:
+            serializer = UserListSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = UserListSerializer(following, many=True)
+        return Response(serializer.data)

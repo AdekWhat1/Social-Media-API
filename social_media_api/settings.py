@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "rest_framework_simplejwt",
     "drf_spectacular",
+    "django_celery_beat",
     "post",
     "user",
 ]
@@ -179,5 +180,21 @@ AUTH_USER_MODEL = "user.User"
 MAILERS = {
     "default": {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
+    },
+}
+
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get(
+    "CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/0"
+)
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "publish-scheduled-posts-every-minute": {
+        "task": "post.tasks.publish_scheduled_posts",
+        "schedule": crontab(minute="*"),
     },
 }
