@@ -43,7 +43,13 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
-    username = None
+    username = models.CharField(
+        _("username"),
+        max_length=150,
+        unique=True,
+        blank=True,
+        null=True,
+    )
     email = models.EmailField(_("email address"), unique=True)
     photo_profile = models.ImageField(
         upload_to=profile_image_file_path,
