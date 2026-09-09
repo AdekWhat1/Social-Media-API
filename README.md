@@ -30,5 +30,4 @@ ReDoc: http://localhost:8000/api/doc/redoc/
 Admin Panel: http://localhost:8000/admin/
 
 5. Stop the Application
-Bash
 docker compose down
